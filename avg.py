@@ -94,96 +94,114 @@ def split_data(input_X, input_y):
 
 df = prep_data(train_df)
 X, y = get_targets(df)
-y = y.reshape(-1, 1)
+# y = y.reshape(-1, 1) # 2D for tensorflow, 1D for sklearn.
 X_train, X_test, y_train, y_test = split_data(X, y)
-
-# ==============================
-# Tensorflow Configuration
-# ==============================
-
-tf.logging.set_verbosity(tf.logging.ERROR)
-tf.reset_default_graph()
-
-# ==============================
-# Setting up model
-# ==============================
-
-learn_rate = 0.001
-input_size = len(X[0])
-output_size = 1
-
-tf_x = tf.placeholder(tf.float32, [None, input_size])
-tf_y = tf.placeholder(tf.float32, [None, output_size])
-
-l1_output_size = input_size * 5
-l2_output_size = input_size * 4
-l3_output_size = input_size * 3
-
-weights = {
-  "l1": tf.Variable(tf.random_normal([input_size, l1_output_size], stddev=0.03), name="W1"),
-  "l2": tf.Variable(tf.random_normal([l1_output_size, l2_output_size], stddev=0.3), name="W2"),
-  "l3": tf.Variable(tf.random_normal([l2_output_size, l3_output_size], stddev=0.3), name="W3"),
-  "out": tf.Variable(tf.random_normal([l3_output_size, output_size], stddev=0.3), name="WOut")
-}
-
-biases = {
-  "l1": tf.Variable(tf.random_normal([l1_output_size]), name='b1'),
-  "l2": tf.Variable(tf.random_normal([l2_output_size]), name='b2'),
-  "l3": tf.Variable(tf.random_normal([l3_output_size]), name='b3'),
-  "out": tf.Variable(tf.random_normal([output_size]), name='bOut')
-}
-
-layer_1 = tf.add(tf.matmul(tf_x, weights["l1"]), biases["l1"])
-layer_1 = tf.nn.relu(layer_1)
-layer_2 = tf.add(tf.matmul(layer_1, weights["l2"]), biases["l2"])
-layer_2 = tf.nn.relu(layer_2)
-layer_3 = tf.add(tf.matmul(layer_2, weights["l3"]), biases["l3"])
-layer_3 = tf.nn.relu(layer_3)
-
-logits = tf.add(tf.matmul(layer_3, weights["out"]), biases["out"])
-out = tf.nn.sigmoid(logits)
-
-model_output = tf.round(out)
-
-cost = tf.losses.sigmoid_cross_entropy(tf_y, out)
-optimizer = tf.train.RMSPropOptimizer(learning_rate=learn_rate).minimize(cost)
-
-correct_prediction = tf.equal(model_output, tf_y)
-accuracy = tf.scalar_mul(100, tf.reduce_mean(tf.cast(correct_prediction, tf.float32)))
-
-saver = tf.train.Saver()
-
-init = tf.global_variables_initializer()
-
-# ==============================
-# Training
-# ==============================
-
-epochs = 600
-
-best_test = 0
-file_name = './titanic_nn.ckpt'
-
-with tf.Session() as session:
-  session.run(init)
-  for epoch in range(epochs):
-    session.run(optimizer, feed_dict={tf_x: X_train, tf_y: y_train})
-    
-    test_acc = session.run(accuracy, feed_dict={tf_x: X_test, tf_y: y_test})
-    if test_acc > best_test:
-      print(f"Epoch {epoch} - acc: {test_acc}, saving model.")
-      best_test = test_acc
-      saver.save(session, file_name)
-                
-# ==============================
-# Predict
-# ==============================
-
 test_input = prep_data(test_df).as_matrix()
 
-with tf.Session() as session:
-  saver.restore(session, file_name)
-  predictions = session.run(model_output, feed_dict={tf_x: test_input})
+# ==============================
+# K-NN
+# ==============================
 
-result['Survived'] = [int(p) for p in predictions]
+from sklearn.neighbors import KNeighborsClassifier
+
+min_neighbors = 1
+max_neighbors = 100
+best_score = 0
+best_neighbors = None
+best_model = None
+
+for i in range(min_neighbors, max_neighbors+1):
+  model = KNeighborsClassifier(n_neighbors=i)
+  model.fit(X_train, y_train)
+  score = model.score(X_test, y_test)
+  if score > best_score:
+    best_neighbors = i
+    best_score = score
+    best_model = model
+
+print(f"Best K-NN ({best_neighbors} neighbors): {round(best_score*100,2)}%")
+result['knn'] = best_model.predict(test_input)
+
+# ==============================
+# Logistic Regression
+# ==============================
+
+from sklearn.linear_model import LogisticRegression
+
+# liblinear
+model = LogisticRegression(solver="liblinear", max_iter=2000)
+model.fit(X_train, y_train)
+score = model.score(X_test, y_test)
+print(f"Logistic Regression with liblinear solver: {round(score*100,2)}%")
+result['lr_ll'] = model.predict(test_input)
+
+# newton-cg
+model = LogisticRegression(solver="newton-cg", max_iter=2000)
+model.fit(X_train, y_train)
+score = model.score(X_test, y_test)
+print(f"Logistic Regression with newton-cg solver: {round(score*100,2)}%")
+result['lr_nc'] = model.predict(test_input)
+
+# ==============================
+# Stochastic Gradient Descent
+# ==============================
+
+from sklearn.linear_model import SGDClassifier
+
+model = SGDClassifier(loss='log', max_iter=5000)
+model.fit(X_train, y_train)
+score = model.score(X_test, y_test)
+print(f"SGD with log loss: {round(score*100,2)}%")
+result['sgd_log'] = model.predict(test_input)
+
+model = SGDClassifier(loss='perceptron', learning_rate='invscaling', eta0=0.01, max_iter=5000)
+model.fit(X_train, y_train)
+score = model.score(X_test, y_test)
+print(f"SGD with perceptron: {round(score*100,2)}%")
+result['sgd_log'] = model.predict(test_input)
+
+# ==============================
+# Support Vector Machine
+# ==============================
+
+from sklearn.svm import SVC
+
+model = SVC()
+model.fit(X_train, y_train)
+score = model.score(X_test, y_test)
+print(f"Support Vector Classification: {round(score*100,2)}%")
+result['svc'] = model.predict(test_input)
+
+# ==============================
+# Random Forest
+# ==============================
+
+from sklearn.ensemble import RandomForestClassifier
+
+min_estimators = 1
+max_estimators = 30
+best_score = 0
+best_n_est = None
+best_model = None
+
+for i in range(min_estimators, max_estimators+1):
+  model = RandomForestClassifier(n_estimators=i)
+  model.fit(X_train, y_train)
+  score = model.score(X_test, y_test)
+  if score > best_score:
+    best_score = score
+    best_model = model
+    best_n_est = i
+
+print(f"Random forest ({best_n_est} estimators): {round(best_score*100,2)}%")
+result['rf'] = model.predict(test_input)
+
+predictions = result.drop(['PassengerId'], axis=1)
+model_col = predictions.columns
+n_models = len(model_col)
+predictions = predictions.sum(axis=1)
+predictions = predictions.apply(lambda row: int(round((row/n_models*1.0)+0.01)))
+result['Survived'] = predictions
+result.drop(model_col, inplace=True, axis=1)
+
 result.to_csv('./output.csv', index=False)
