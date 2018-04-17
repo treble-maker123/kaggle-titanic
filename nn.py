@@ -25,6 +25,10 @@ test_df =  pd.read_csv(data_folder + "test.csv")
 dummy_df = train_df
 dummy_df = dummy_df.append(test_df, ignore_index=True)
 
+# Output data
+test_passenger_ids = test_df['PassengerId']
+result = pd.DataFrame({"PassengerId": test_passenger_ids})
+
 # Fit encoders with both train and test data
 sex_encoder = LabelEncoder()
 embarked_encoder = LabelEncoder()
@@ -50,7 +54,7 @@ for i, c in enumerate(scaled_col):
   values = dummy_df[c].as_matrix().reshape(-1, 1)
   scalers[i].fit(values)
 
-def prep_data(input_df, is_training=True):
+def prep_data(input_df):
   names = [name.split(',')[1] for name in input_df['Name'].as_matrix()]
   input_df['Title'] = [name.split('.')[0].strip() for name in names]
   
@@ -93,9 +97,6 @@ X, y = get_targets(df)
 y = y.reshape(-1, 1)
 X_train, X_test, y_train, y_test = split_data(X, y)
 
-test_passenger_ids = test_df['PassengerId']
-test_input = prep_data(test_df, is_training=False).as_matrix()
-
 # ==============================
 # Tensorflow Configuration
 # ==============================
@@ -104,17 +105,12 @@ tf.logging.set_verbosity(tf.logging.ERROR)
 tf.reset_default_graph()
 
 # ==============================
-# Neural network parameters
+# Setting up model
 # ==============================
 
 learn_rate = 0.001
-epochs = 600
 input_size = len(X[0])
 output_size = 1
-
-# ==============================
-# Setting up model
-# ==============================
 
 tf_x = tf.placeholder(tf.float32, [None, input_size])
 tf_y = tf.placeholder(tf.float32, [None, output_size])
@@ -163,6 +159,8 @@ init = tf.global_variables_initializer()
 # Training
 # ==============================
 
+epochs = 600
+
 best_test = 0
 file_name = './titanic_nn.ckpt'
 
@@ -181,7 +179,7 @@ with tf.Session() as session:
 # Predict
 # ==============================
 
-result = pd.DataFrame({"PassengerId": test_passenger_ids})
+test_input = prep_data(test_df).as_matrix()
 
 with tf.Session() as session:
   saver.restore(session, file_name)
