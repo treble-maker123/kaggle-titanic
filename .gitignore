@@ -1,1 +1,3 @@
 output.csv
+checkpoint
+titanic_nn.ckpt*

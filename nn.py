@@ -107,8 +107,8 @@ tf.reset_default_graph()
 # Neural network parameters
 # ==============================
 
-learn_rate = 0.01
-epochs = 400
+learn_rate = 0.001
+epochs = 600
 input_size = len(X[0])
 output_size = 1
 
@@ -171,12 +171,11 @@ with tf.Session() as session:
   for epoch in range(epochs):
     session.run(optimizer, feed_dict={tf_x: X_train, tf_y: y_train})
     
-    if epoch%5==0:
-      test_acc = session.run(accuracy, feed_dict={tf_x: X_test, tf_y: y_test})
-      if test_acc > best_test:
-        print(f"Epoch {epoch} - acc: {test_acc}, saving model.")
-        best_test = test_acc
-        saver.save(session, file_name)
+    test_acc = session.run(accuracy, feed_dict={tf_x: X_test, tf_y: y_test})
+    if test_acc > best_test:
+      print(f"Epoch {epoch} - acc: {test_acc}, saving model.")
+      best_test = test_acc
+      saver.save(session, file_name)
                 
 # ==============================
 # Predict
