@@ -1,3 +1,4 @@
 output.csv
 checkpoint
 titanic_nn.ckpt*
+.DS_Store
