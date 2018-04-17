@@ -11,8 +11,6 @@ from sklearn import preprocessing
 from sklearn.preprocessing import LabelEncoder
 from sklearn.model_selection import train_test_split
 
-import tensorflow as tf
-
 # Input data files are available in the "../input/" directory.
 # For example, running this (by clicking run or pressing Shift+Enter) will list the files in the input directory
 
